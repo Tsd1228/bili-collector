@@ -136,7 +136,7 @@ def extract_videos_from_page(page) -> list[dict]:
 # 🚀 核心采集函数（供外部调用）
 # ============================================================
 
-MAX_SCROLLS = 30
+MAX_SCROLLS = 15
 
 
 def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
@@ -189,7 +189,7 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
         favlist_url = f"https://space.bilibili.com/{uid}/favlist"
         log.info(f"进入收藏夹: {favlist_url}")
         page.goto(favlist_url, timeout=60_000)
-        page.wait_for_timeout(4000)
+        page.wait_for_timeout(2000)
         
         if "登录" in page.title():
             log.error("未登录，请删除 user_data 目录后重新运行")

@@ -420,7 +420,7 @@ def scroll_to_bottom(page, max_scrolls: int = 30, step: int = 800) -> int:
 
     for i in range(max_scrolls):
         page.mouse.wheel(0, step)
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(400)
         scroll_count += 1
 
         current_height = page.evaluate("document.body.scrollHeight")

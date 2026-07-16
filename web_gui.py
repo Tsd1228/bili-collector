@@ -32,6 +32,7 @@ app_state = {
     "status": "checking",
     "message": "",
     "total_videos": 0,
+    "auto_close": False,
 }
 
 
@@ -83,6 +84,12 @@ def do_collect():
         app_state["total_videos"] = total
         app_state["status"] = "done"
         app_state["message"] = f"Done! {total} videos collected"
+        
+        if app_state["auto_close"]:
+            import time
+            time.sleep(1)
+            import os
+            os._exit(0)
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = str(e)
@@ -246,6 +253,21 @@ HTML = """<!DOCTYPE html>
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .hidden { display: none !important; }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+        }
+        .checkbox-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #00a1d6;
+        }
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -273,6 +295,10 @@ HTML = """<!DOCTYPE html>
                 <button id="loginBtn" class="btn hidden" onclick="doLogin()">Login Bilibili</button>
                 <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
                 <button id="retryBtn" class="btn btn-secondary hidden" onclick="doCollect()">Retry</button>
+                <label class="checkbox-label hidden" id="autoCloseLabel">
+                    <input type="checkbox" id="autoCloseCheck" onchange="toggleAutoClose(this.checked)">
+                    <span>采集完成后自动关闭程序</span>
+                </label>
             </div>
         </div>
         <div class="footer">Data stored locally in program directory</div>
@@ -281,16 +307,26 @@ HTML = """<!DOCTYPE html>
     <script>
         let pollTimer = null;
 
+        function toggleAutoClose(enabled) {
+            fetch('/api/auto_close', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({enabled: enabled})
+            });
+        }
+
         function updateUI(data) {
             const status = document.getElementById('status');
             const userInfo = document.getElementById('userInfo');
             const loginBtn = document.getElementById('loginBtn');
             const collectBtn = document.getElementById('collectBtn');
             const retryBtn = document.getElementById('retryBtn');
+            const autoCloseLabel = document.getElementById('autoCloseLabel');
 
             loginBtn.classList.add('hidden');
             collectBtn.classList.add('hidden');
             retryBtn.classList.add('hidden');
+            autoCloseLabel.classList.add('hidden');
 
             switch(data.status) {
                 case 'checking':
@@ -306,6 +342,7 @@ HTML = """<!DOCTYPE html>
                     userInfo.textContent = 'UID: ' + data.uid;
                     userInfo.classList.remove('hidden');
                     collectBtn.classList.remove('hidden');
+                    autoCloseLabel.classList.remove('hidden');
                     break;
                 case 'collecting':
                     status.innerHTML = '<div class="spinner"></div>Collecting data...';
@@ -408,6 +445,13 @@ class Handler(BaseHTTPRequestHandler):
             app_state["status"] = "collecting"
             app_state["message"] = "Collecting..."
             threading.Thread(target=do_collect, daemon=True).start()
+            self._json_response({"status": "ok"})
+
+        elif self.path == "/api/auto_close":
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body)
+            app_state["auto_close"] = data.get("enabled", False)
             self._json_response({"status": "ok"})
 
         else:
