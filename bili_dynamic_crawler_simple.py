@@ -4,7 +4,7 @@ B站动态爬虫（精简版）
 
 功能：
   1. 爬取指定用户的全部动态
-  2. 导出原始 + 精简 JSON
+  2. 只输出转发动态的精简 JSON
   3. 支持断点续爬
   4. Cookie 从配置文件读取
 
@@ -13,7 +13,7 @@ B站动态爬虫（精简版）
   python bili_dynamic_crawler_simple.py --uid 229558048
   python bili_dynamic_crawler_simple.py --reset  # 清除进度，重新爬取
 
-配置文件：~/.bilibili_fav/dynamic_config.json
+配置文件：./dynamic_config.json
   {
     "uid": 229558048,
     "sessdata": "...",
@@ -201,26 +201,8 @@ def simplify_dynamic(item: dict) -> dict:
                 result["type"] = "image"
                 result["pictures"] = [p.get("src") for p in draw.get("items", [])]
 
-        elif item.get("type") == "DYNAMIC_TYPE_AV":
-            major = dynamic.get("major", {})
-            arc = major.get("archive", {})
-            result["type"] = "video"
-            result["video_bvid"] = arc.get("bvid")
-            result["video_title"] = arc.get("title")
-            result["content"] = arc.get("desc")
-
-        elif item.get("type") == "DYNAMIC_TYPE_DRAW":
-            major = dynamic.get("major", {})
-            draw = major.get("draw", {})
-            result["type"] = "image"
-            result["pictures"] = [p.get("src") for p in draw.get("items", [])]
-
-        elif item.get("type") == "DYNAMIC_TYPE_COMMON_SQUARE":
-            major = dynamic.get("major", {})
-            common = major.get("common", {})
-            result["type"] = "common"
-            result["video_title"] = common.get("title")
-            result["content"] = common.get("desc")
+        else:
+            return None
 
         if not result["content"]:
             desc = dynamic.get("desc", {})
@@ -265,17 +247,16 @@ async def crawl(config: dict, reset: bool = False):
     existing_items = []
 
     # 如果有进度，加载已有数据
-    raw_file = output_dir / f"uid_{uid}_raw.json"
     simple_file = output_dir / f"uid_{uid}_simple.json"
 
-    if not reset and raw_file.exists():
+    if not reset and simple_file.exists():
         try:
-            existing_items = json.loads(raw_file.read_text(encoding="utf-8"))
-            print(f"📂 加载已有数据: {len(existing_items)} 条")
+            existing_simple = json.loads(simple_file.read_text(encoding="utf-8"))
+            print(f"📂 加载已有精简数据: {len(existing_simple)} 条")
         except Exception:
-            existing_items = []
+            existing_simple = []
 
-    all_items = list(existing_items)
+    all_items = []
     offset = progress.get("offset", "")
     page_num = progress.get("page", 0)
 
@@ -355,7 +336,7 @@ async def crawl(config: dict, reset: bool = False):
             save_progress(uid, progress)
 
             # 增量保存原始数据
-            raw_file.write_text(json.dumps(all_items, ensure_ascii=False, indent=2), encoding="utf-8")
+            simple_file.write_text(json.dumps(all_items, ensure_ascii=False, indent=2), encoding="utf-8")
 
             print(f"   ✅ 本页 {len(items)} 条，累计 {len(all_items)} 条")
 
@@ -365,7 +346,7 @@ async def crawl(config: dict, reset: bool = False):
 
             await asyncio.sleep(PAGE_SLEEP)
 
-    # 导出精简版
+    # 导出精简版（只保留转发动态）
     simplified = []
     for item in all_items:
         simple = simplify_dynamic(item)
@@ -374,8 +355,7 @@ async def crawl(config: dict, reset: bool = False):
 
     simple_file.write_text(json.dumps(simplified, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    print(f"\n🎉 原始动态: {len(all_items)} 条 -> {raw_file}")
-    print(f"✅ 精简动态: {len(simplified)} 条 -> {simple_file}")
+    print(f"\n✅ 转发动态: {len(simplified)} 条 -> {simple_file}")
 
     # 清理进度文件
     if progress_file.exists():

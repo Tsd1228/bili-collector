@@ -84,15 +84,20 @@ def do_collect():
         app_state["total_videos"] = total
         app_state["status"] = "done"
         app_state["message"] = f"Done! {total} videos collected"
-        
-        if app_state["auto_close"]:
-            import time
-            time.sleep(1)
-            import os
-            os._exit(0)
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = str(e)
+
+
+def do_analyze():
+    try:
+        from analyze import save_report
+        report_path = save_report(app_state["uid"])
+        app_state["status"] = "analyzed"
+        app_state["message"] = f"Report saved: {report_path}"
+    except Exception as e:
+        app_state["status"] = "error"
+        app_state["message"] = f"Analysis failed: {e}"
 
 
 HTML = """<!DOCTYPE html>
@@ -294,6 +299,7 @@ HTML = """<!DOCTYPE html>
             <div class="actions">
                 <button id="loginBtn" class="btn hidden" onclick="doLogin()">Login Bilibili</button>
                 <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
+                <button id="analyzeBtn" class="btn btn-secondary hidden" onclick="doAnalyze()">Generate Report</button>
                 <button id="retryBtn" class="btn btn-secondary hidden" onclick="doCollect()">Retry</button>
                 <label class="checkbox-label hidden" id="autoCloseLabel">
                     <input type="checkbox" id="autoCloseCheck" checked onchange="toggleAutoClose(this.checked)">
@@ -320,11 +326,13 @@ HTML = """<!DOCTYPE html>
             const userInfo = document.getElementById('userInfo');
             const loginBtn = document.getElementById('loginBtn');
             const collectBtn = document.getElementById('collectBtn');
+            const analyzeBtn = document.getElementById('analyzeBtn');
             const retryBtn = document.getElementById('retryBtn');
             const autoCloseLabel = document.getElementById('autoCloseLabel');
 
             loginBtn.classList.add('hidden');
             collectBtn.classList.add('hidden');
+            analyzeBtn.classList.add('hidden');
             retryBtn.classList.add('hidden');
             autoCloseLabel.classList.add('hidden');
 
@@ -353,6 +361,15 @@ HTML = """<!DOCTYPE html>
                     status.className = 'status-text success';
                     userInfo.textContent = 'UID: ' + data.uid;
                     userInfo.classList.remove('hidden');
+                    analyzeBtn.classList.remove('hidden');
+                    retryBtn.classList.remove('hidden');
+                    break;
+                case 'analyzed':
+                    status.textContent = data.message;
+                    status.className = 'status-text success';
+                    userInfo.textContent = 'UID: ' + data.uid;
+                    userInfo.classList.remove('hidden');
+                    analyzeBtn.classList.remove('hidden');
                     retryBtn.classList.remove('hidden');
                     break;
                 case 'error':
@@ -377,6 +394,14 @@ HTML = """<!DOCTYPE html>
 
         function doCollect() {
             fetch('/api/collect', {method: 'POST'})
+                .then(r => r.json())
+                .then(data => {
+                    pollStatus();
+                });
+        }
+
+        function doAnalyze() {
+            fetch('/api/analyze', {method: 'POST'})
                 .then(r => r.json())
                 .then(data => {
                     pollStatus();
@@ -452,6 +477,16 @@ class Handler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body)
             app_state["auto_close"] = data.get("enabled", False)
+            self._json_response({"status": "ok"})
+
+        elif self.path == "/api/analyze":
+            if app_state["status"] in ("collecting", "analyzing"):
+                self._json_response({"status": "error", "message": "Busy"})
+                return
+
+            app_state["status"] = "analyzing"
+            app_state["message"] = "Generating report..."
+            threading.Thread(target=do_analyze, daemon=True).start()
             self._json_response({"status": "ok"})
 
         else:
