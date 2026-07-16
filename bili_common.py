@@ -143,11 +143,10 @@ def install_chromium():
         log.error(f"Cannot find playwright driver: {e}")
         raise
 
-    # Allow mirror override via env var
-    download_host = os.environ.get("PLAYWRIGHT_DOWNLOAD_HOST")
-    if download_host:
-        log.info(f"Using mirror: {download_host}")
-        driver_env["PLAYWRIGHT_DOWNLOAD_HOST"] = download_host
+    # 国内镜像
+    mirror = "https://npmmirror.com/mirrors/playwright"
+    driver_env["PLAYWRIGHT_DOWNLOAD_HOST"] = mirror
+    log.info(f"Using mirror: {mirror}")
 
     # Try install with retries
     for attempt in range(3):
