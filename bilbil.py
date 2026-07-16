@@ -163,8 +163,11 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
     ensure_dir(data_dir)
     ensure_dir(user_dir)
     
-    if not check_chromium():
-        install_chromium()
+    # 优先用本地浏览器，没有才尝试安装 Chromium
+    from bili_common import find_local_browser
+    if not find_local_browser():
+        if not check_chromium():
+            install_chromium()
     
     # 清除进度
     if reset and progress_file.exists():
