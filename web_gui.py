@@ -32,7 +32,7 @@ app_state = {
     "status": "checking",
     "message": "",
     "total_videos": 0,
-    "auto_close": False,
+    "auto_close": True,
 }
 
 
@@ -296,7 +296,7 @@ HTML = """<!DOCTYPE html>
                 <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
                 <button id="retryBtn" class="btn btn-secondary hidden" onclick="doCollect()">Retry</button>
                 <label class="checkbox-label hidden" id="autoCloseLabel">
-                    <input type="checkbox" id="autoCloseCheck" onchange="toggleAutoClose(this.checked)">
+                    <input type="checkbox" id="autoCloseCheck" checked onchange="toggleAutoClose(this.checked)">
                     <span>采集完成后自动关闭程序</span>
                 </label>
             </div>
