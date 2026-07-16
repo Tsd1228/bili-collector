@@ -23,18 +23,18 @@ from pathlib import Path
 TOOLS = {
     "gui": {
         "script": "web_gui.py",
-        "name": "B站数据采集",
-        "desc": "图形界面版（推荐）",
+        "name": "BiliCollector",
+        "desc": "GUI",
     },
     "bilbil": {
         "script": "bilbil.py",
         "name": "bili_fav_extract",
-        "desc": "收藏夹命令行版",
+        "desc": "CLI",
     },
     "dynamic": {
         "script": "bili_dynamic_crawler_simple.py",
         "name": "bili_dynamic",
-        "desc": "动态爬虫命令行版",
+        "desc": "CLI",
     },
 }
 
