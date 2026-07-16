@@ -6,3 +6,9 @@ dist/
 .eggs/
 *.egg-info/
 .bilibili_fav/
+user_data_*/
+data_*/
+dynamics_*/
+bili_uid.txt
+dynamic_config.json
+dynamic_progress*.json
