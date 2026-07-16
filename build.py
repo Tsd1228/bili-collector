@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-"""
-B站工具打包脚本
-
-支持打包：
-  - gui.py（图形界面版 — 推荐用户使用）
-  - bilbil.py（命令行版）
-  - bili_dynamic_crawler_simple.py（命令行版）
-
-用法：
-  python build.py              # 打包所有
-  python build.py gui          # 只打包 GUI（推荐）
-  python build.py bilbil       # 只打包收藏夹
-  python build.py dynamic      # 只打包动态
-"""
-
 import subprocess
 import sys
 import platform
@@ -39,20 +24,20 @@ TOOLS = {
 }
 
 
-def run_cmd(cmd: list[str], check: bool = True) -> subprocess.CompletedProcess:
+def run_cmd(cmd, check=True):
     print(f"  > {' '.join(cmd)}")
     return subprocess.run(cmd, check=check)
 
 
-def build_tool(tool_key: str):
+def build_tool(tool_key):
     tool = TOOLS[tool_key]
     script = Path(tool["script"])
 
     if not script.exists():
-        print(f"  ❌ 未找到 {script}")
+        print(f"  [FAIL] not found: {script}")
         return False
 
-    print(f"\n🔨 打包 {tool['desc']}: {tool['name']}")
+    print(f"\n[BUILD] {tool['desc']}: {tool['name']}")
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -60,9 +45,8 @@ def build_tool(tool_key: str):
         "--noconfirm",
         "--onefile",
         "--name", tool["name"],
+        str(script),
     ]
-
-    cmd.append(str(script))
 
     run_cmd(cmd)
 
@@ -72,31 +56,28 @@ def build_tool(tool_key: str):
 
     if output.exists():
         size_mb = output.stat().st_size / (1024 * 1024)
-        print(f"  ✅ 成功: {output.resolve()} ({size_mb:.1f} MB)")
+        print(f"  [OK] {output.resolve()} ({size_mb:.1f} MB)")
         return True
     else:
-        print(f"  ❌ 失败: 未找到输出文件")
+        print(f"  [FAIL] output not found")
         return False
 
 
 def main():
     system = platform.system()
-    print(f"🖥️  系统: {system} ({platform.machine()})")
-    print(f"📂 目录: {Path.cwd().resolve()}\n")
+    print(f"[SYS] {system} ({platform.machine()})")
+    print(f"[DIR] {Path.cwd().resolve()}\n")
 
-    # 检查 Python
-    print("🐍 检查 Python 版本...")
+    print("[CHECK] Python version...")
     if sys.version_info < (3, 10):
-        print(f"  ❌ 需要 Python 3.10+，当前: {sys.version}")
+        print(f"  [FAIL] need Python 3.10+, got {sys.version}")
         sys.exit(1)
-    print(f"  ✅ Python {sys.version.split()[0]}")
+    print(f"  [OK] Python {sys.version.split()[0]}")
 
-    # 安装依赖
-    print("\n📦 安装依赖...")
-    run_cmd([sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "-q"])
+    print("\n[DEPS] installing...")
+    run_cmd([sys.executable, "-m", "pip", "install", "aiohttp", "-q"])
     run_cmd([sys.executable, "-m", "pip", "install", "pyinstaller", "-q"])
 
-    # 确定要打包的工具
     target = sys.argv[1] if len(sys.argv) > 1 else "all"
 
     if target == "all":
@@ -104,28 +85,20 @@ def main():
     elif target in TOOLS:
         tools_to_build = [target]
     else:
-        print(f"\n❌ 未知工具: {target}")
-        print(f"   可选: {', '.join(TOOLS.keys())}, all")
+        print(f"\n[FAIL] unknown tool: {target}")
+        print(f"  available: {', '.join(TOOLS.keys())}, all")
         sys.exit(1)
 
-    # 打包
     results = {}
     for tool_key in tools_to_build:
         results[tool_key] = build_tool(tool_key)
 
-    # 汇总
     print(f"\n{'=' * 50}")
-    print("📋 打包结果汇总:")
+    print("[SUMMARY]")
     print(f"{'=' * 50}")
     for tool_key, success in results.items():
-        status = "✅" if success else "❌"
+        status = "[OK]" if success else "[FAIL]"
         print(f"  {status} {TOOLS[tool_key]['desc']}: {TOOLS[tool_key]['name']}")
-
-    print("\n📦 分发给用户:")
-    print("  1. 将 dist/ 下的可执行文件发给用户")
-    print("  2. 用户双击运行，无需安装任何东西")
-    print("  3. 首次运行会自动下载 Chromium（约 150MB）")
-    print("  4. 扫码登录 → 点击采集 → 完成")
 
 
 if __name__ == "__main__":

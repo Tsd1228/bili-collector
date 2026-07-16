@@ -334,9 +334,9 @@ def main():
     port = 18234
     server = HTTPServer(("127.0.0.1", port), Handler)
 
-    print(f"🌐 服务已启动: http://127.0.0.1:{port}")
-    print("   浏览器将自动打开，请按提示操作")
-    print("   按 Ctrl+C 退出\n")
+    print(f"[OK] Server started: http://127.0.0.1:{port}")
+    print("     Browser will open automatically")
+    print("     Press Ctrl+C to exit\n")
 
     # 自动打开浏览器
     threading.Timer(0.5, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
@@ -344,7 +344,7 @@ def main():
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n👋 已退出")
+        print("\n[EXIT] Bye")
         server.server_close()
 
 
