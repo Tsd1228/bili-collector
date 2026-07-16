@@ -29,7 +29,7 @@ UID_FILE = BILI_FAV_HOME / "bili_uid.txt"
 # 状态
 app_state = {
     "uid": None,
-    "status": "checking",  # checking / need_login / logged_in / collecting / done / error
+    "status": "checking",
     "message": "",
     "total_videos": 0,
 }
@@ -52,17 +52,16 @@ def do_login():
         from bili_common import find_local_browser, do_login as _do_login
         from playwright.sync_api import sync_playwright
 
-        # 如果本地有浏览器，直接用，不需要下载 Chromium
         local_browser = find_local_browser()
         if not local_browser:
             from bili_common import check_chromium, install_chromium
             if not check_chromium():
-                app_state["message"] = "Downloading Chromium (about 150MB), please wait..."
+                app_state["message"] = "Downloading Chromium, please wait..."
                 try:
                     install_chromium()
                 except Exception as e:
                     app_state["status"] = "error"
-                    app_state["message"] = f"Chromium download failed: {e}. Please install Chrome or Edge."
+                    app_state["message"] = f"Download failed: {e}"
                     return
 
         with sync_playwright() as p:
@@ -83,7 +82,7 @@ def do_collect():
         total = sum(len(v) for v in videos) if videos else 0
         app_state["total_videos"] = total
         app_state["status"] = "done"
-        app_state["message"] = f"采集完成，共 {total} 个视频"
+        app_state["message"] = f"Done! {total} videos collected"
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = str(e)
@@ -98,96 +97,185 @@ HTML = """<!DOCTYPE html>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #0f0f1a;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 40%, rgba(0,161,214,0.08) 0%, transparent 50%),
+                        radial-gradient(circle at 70% 60%, rgba(118,75,162,0.08) 0%, transparent 50%);
+            animation: bgFloat 20s ease-in-out infinite;
+        }
+        @keyframes bgFloat {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(-2%, -2%); }
+        }
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 440px;
         }
         .card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 50px 40px;
-            width: 420px;
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 24px;
+            padding: 48px 40px;
             text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4),
+                        inset 0 1px 0 rgba(255,255,255,0.05);
+        }
+        .logo {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #00a1d6, #764ba2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 20px rgba(0,161,214,0.3);
         }
         h1 {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 10px;
+            font-size: 22px;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: -0.5px;
+            margin-bottom: 6px;
         }
         .subtitle {
-            color: #999;
-            font-size: 14px;
-            margin-bottom: 30px;
+            color: rgba(255,255,255,0.35);
+            font-size: 13px;
+            margin-bottom: 36px;
         }
-        .status-box {
-            background: #f8f9fa;
-            border-radius: 12px;
+        .status-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
             padding: 20px;
-            margin-bottom: 30px;
-            min-height: 80px;
+            margin-bottom: 28px;
+            min-height: 72px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         .status-text {
-            font-size: 16px;
-            color: #333;
-        }
-        .status-text.success { color: #28a745; }
-        .status-text.error { color: #dc3545; }
-        .user-info {
             font-size: 14px;
-            color: #666;
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-text.success { color: #4ade80; }
+        .status-text.error { color: #f87171; }
+        .user-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             margin-top: 10px;
+            padding: 6px 14px;
+            background: rgba(0,161,214,0.1);
+            border: 1px solid rgba(0,161,214,0.2);
+            border-radius: 20px;
+            font-size: 12px;
+            color: #00a1d6;
+            font-family: "SF Mono", "Fira Code", monospace;
+        }
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         .btn {
-            display: inline-block;
-            padding: 14px 40px;
-            font-size: 16px;
-            font-weight: 600;
+            position: relative;
+            width: 100%;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 500;
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s;
-            color: white;
-            background: linear-gradient(135deg, #00a1d6 0%, #0091d5 100%);
+            transition: all 0.2s ease;
+            color: #fff;
+            background: linear-gradient(135deg, #00a1d6 0%, #0088cc 100%);
+            box-shadow: 0 4px 16px rgba(0,161,214,0.3);
+            letter-spacing: 0.3px;
         }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0,161,214,0.4); }
-        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(0,161,214,0.4);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn:disabled {
+            background: rgba(255,255,255,0.08);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+            color: rgba(255,255,255,0.3);
+        }
         .btn-secondary {
-            background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: none;
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.1);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
         }
         .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #ddd;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.15);
             border-top-color: #00a1d6;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 10px;
-            vertical-align: middle;
+            animation: spin 0.7s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 11px;
+            color: rgba(255,255,255,0.15);
+        }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h1>BiliCollector</h1>
-        <p class="subtitle">Login to your Bilibili account and collect data</p>
-        
-        <div class="status-box">
-            <div id="status" class="status-text">正在检测登录状态...</div>
-            <div id="userInfo" class="user-info hidden"></div>
+    <div class="container">
+        <div class="card">
+            <div class="logo">B</div>
+            <h1>BiliCollector</h1>
+            <p class="subtitle">Bilibili favorites &amp; dynamics collector</p>
+
+            <div class="status-section">
+                <div id="status" class="status-text">
+                    <div class="spinner"></div>
+                    Checking login status...
+                </div>
+                <div id="userInfo" class="user-tag hidden"></div>
+            </div>
+
+            <div class="actions">
+                <button id="loginBtn" class="btn hidden" onclick="doLogin()">Login Bilibili</button>
+                <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
+                <button id="retryBtn" class="btn btn-secondary hidden" onclick="doCollect()">Retry</button>
+            </div>
         </div>
-        
-        <div id="actions">
-            <button id="loginBtn" class="btn hidden" onclick="doLogin()">Login Bilibili</button>
-            <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
-            <button id="retryBtn" class="btn hidden" onclick="doCollect()">重新采集</button>
-        </div>
+        <div class="footer">Data stored locally in program directory</div>
     </div>
 
     <script>
@@ -206,21 +294,22 @@ HTML = """<!DOCTYPE html>
 
             switch(data.status) {
                 case 'checking':
-                    status.innerHTML = '<span class="spinner"></span>正在检测登录状态...';
+                    status.innerHTML = '<div class="spinner"></div>Checking login status...';
                     break;
                 case 'need_login':
-                    status.textContent = 'Not logged in, click below to login';
+                    status.textContent = 'Not logged in';
                     loginBtn.classList.remove('hidden');
                     break;
                 case 'logged_in':
-                    status.textContent = 'Logged in';
+                    status.textContent = 'Ready to collect';
                     status.className = 'status-text success';
                     userInfo.textContent = 'UID: ' + data.uid;
                     userInfo.classList.remove('hidden');
                     collectBtn.classList.remove('hidden');
                     break;
                 case 'collecting':
-                    status.innerHTML = '<span class="spinner"></span>Collecting data, please wait...';
+                    status.innerHTML = '<div class="spinner"></div>Collecting data...';
+                    status.className = 'status-text';
                     break;
                 case 'done':
                     status.textContent = data.message;
@@ -228,13 +317,11 @@ HTML = """<!DOCTYPE html>
                     userInfo.textContent = 'UID: ' + data.uid;
                     userInfo.classList.remove('hidden');
                     retryBtn.classList.remove('hidden');
-                    retryBtn.textContent = 'Re-collect';
                     break;
                 case 'error':
-                    status.textContent = 'Error: ' + data.message;
+                    status.textContent = data.message;
                     status.className = 'status-text error';
                     retryBtn.classList.remove('hidden');
-                    retryBtn.textContent = 'Retry';
                     break;
             }
         }
@@ -246,7 +333,7 @@ HTML = """<!DOCTYPE html>
                     if (data.status === 'ok') {
                         pollStatus();
                     } else {
-                        alert('登录失败: ' + data.message);
+                        alert(data.message);
                     }
                 });
         }
@@ -273,7 +360,6 @@ HTML = """<!DOCTYPE html>
             }, 1000);
         }
 
-        // 初始加载
         fetch('/api/status')
             .then(r => r.json())
             .then(data => {
@@ -306,21 +392,21 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/login":
             if app_state["status"] in ("collecting",):
-                self._json_response({"status": "error", "message": "采集中，请稍后"})
+                self._json_response({"status": "error", "message": "Collecting in progress"})
                 return
 
             app_state["status"] = "checking"
-            app_state["message"] = "正在打开浏览器..."
+            app_state["message"] = "Opening browser..."
             threading.Thread(target=do_login, daemon=True).start()
             self._json_response({"status": "ok"})
 
         elif self.path == "/api/collect":
             if app_state["status"] == "collecting":
-                self._json_response({"status": "error", "message": "正在采集中"})
+                self._json_response({"status": "error", "message": "Already collecting"})
                 return
 
             app_state["status"] = "collecting"
-            app_state["message"] = "正在采集数据..."
+            app_state["message"] = "Collecting..."
             threading.Thread(target=do_collect, daemon=True).start()
             self._json_response({"status": "ok"})
 
@@ -335,34 +421,31 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode("utf-8"))
 
     def log_message(self, format, *args):
-        pass  # 静默日志
+        pass
 
 
 def main():
-    # 检查登录状态
     uid = check_login()
     if uid:
         app_state["uid"] = uid
         app_state["status"] = "logged_in"
-        app_state["message"] = "已登录"
+        app_state["message"] = "Logged in"
     else:
         app_state["status"] = "need_login"
 
-    # 启动服务器
     port = 18234
     server = HTTPServer(("127.0.0.1", port), Handler)
 
-    print(f"[OK] Server started: http://127.0.0.1:{port}")
-    print("     Browser will open automatically")
-    print("     Press Ctrl+C to exit\n")
+    print(f"Server started: http://127.0.0.1:{port}")
+    print("Browser will open automatically")
+    print("Press Ctrl+C to exit\n")
 
-    # 自动打开浏览器
     threading.Timer(0.5, lambda: webbrowser.open(f"http://127.0.0.1:{port}")).start()
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n[EXIT] Bye")
+        print("\nBye")
         server.server_close()
 
 
