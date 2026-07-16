@@ -26,6 +26,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import os
 import time
 import urllib.parse
 from pathlib import Path
@@ -36,7 +37,12 @@ import aiohttp
 # 📁 路径
 # ============================================================
 
-BILI_FAV_HOME = Path.home() / ".bilibili_fav"
+# 与 bili_common.py 保持一致：默认在脚本同级目录
+_base_dir = Path(__file__).parent.resolve()
+if os.environ.get("BILI_PORTABLE", "1") == "0":
+    _base_dir = Path.home() / ".bilibili_fav"
+
+BILI_FAV_HOME = _base_dir
 CONFIG_FILE = BILI_FAV_HOME / "dynamic_config.json"
 
 PAGE_SLEEP = 0.3

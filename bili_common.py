@@ -13,6 +13,7 @@ B站工具库 — 共享模块
 
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -26,13 +27,18 @@ from playwright.sync_api import sync_playwright
 # 📁 路径常量
 # ============================================================
 
-BILI_FAV_HOME = Path.home() / ".bilibili_fav"
-DEFAULT_DATA_DIR = BILI_FAV_HOME / "data"
+# 数据目录：默认在脚本/exe 同级目录下（便携模式）
+# 如果需要存到用户目录，设环境变量 BILI_PORTABLE=0
+_base_dir = Path(__file__).parent.resolve()
+if os.environ.get("BILI_PORTABLE", "1") == "0":
+    _base_dir = Path.home() / ".bilibili_fav"
+
+BILI_FAV_HOME = _base_dir
 UID_FILE = BILI_FAV_HOME / "bili_uid.txt"
 
 
 def get_user_dir(uid: str = None) -> Path:
-    """按 UID 隔离的用户数据目录"""
+    """按 UID 隔离的浏览器数据目录"""
     if uid:
         return BILI_FAV_HOME / f"user_data_{uid}"
     return BILI_FAV_HOME / "user_data"
@@ -42,7 +48,7 @@ def get_data_dir(uid: str = None) -> Path:
     """按 UID 隔离的输出数据目录"""
     if uid:
         return BILI_FAV_HOME / f"data_{uid}"
-    return DEFAULT_DATA_DIR
+    return BILI_FAV_HOME / "data"
 
 
 def get_progress_file(uid: str = None) -> Path:
@@ -197,12 +203,18 @@ def do_login(p, uid: str = None) -> str:
         temp_user_dir = get_user_dir("temp")
         temp_user_dir.mkdir(parents=True, exist_ok=True)
         
-        context = p.chromium.launch_persistent_context(
-            user_data_dir=str(temp_user_dir),
-            headless=False,
-            args=["--no-sandbox"],
-            viewport={"width": 1080, "height": 1080},
-        )
+        launch_kwargs = {
+            "user_data_dir": str(temp_user_dir),
+            "headless": False,
+            "args": ["--no-sandbox"],
+            "viewport": {"width": 1080, "height": 1080},
+        }
+        
+        local_browser = find_local_browser()
+        if local_browser:
+            launch_kwargs["executable_path"] = local_browser
+        
+        context = p.chromium.launch_persistent_context(**launch_kwargs)
         
         page = context.pages[0] if context.pages else context.new_page()
         
@@ -466,17 +478,62 @@ def is_done(progress_file: Path, key: str) -> bool:
 # ============================================================
 
 
+def find_local_browser() -> str | None:
+    """查找本地 Chrome 或 Edge 浏览器路径"""
+    import platform
+    system = platform.system()
+
+    if system == "Windows":
+        candidates = [
+            # Chrome
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+            # Edge
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        ]
+    elif system == "Darwin":
+        candidates = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        ]
+    else:
+        candidates = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/microsoft-edge",
+        ]
+
+    for path in candidates:
+        if os.path.exists(path):
+            log.info(f"Found browser: {path}")
+            return path
+
+    return None
+
+
 def create_browser_context(p, headless: bool = True, uid: str = None):
-    """创建浏览器上下文，按 UID 隔离"""
+    """创建浏览器上下文，优先使用本地浏览器"""
+    import os
     user_dir = get_user_dir(uid)
     user_dir.mkdir(parents=True, exist_ok=True)
-    
-    return p.chromium.launch_persistent_context(
-        user_data_dir=str(user_dir),
-        headless=headless,
-        args=["--no-sandbox"],
-        viewport={"width": 1080, "height": 1080},
-    )
+
+    kwargs = {
+        "user_data_dir": str(user_dir),
+        "headless": headless,
+        "args": ["--no-sandbox"],
+        "viewport": {"width": 1080, "height": 1080},
+    }
+
+    # 优先使用本地浏览器，跳过 Chromium 下载
+    local_browser = find_local_browser()
+    if local_browser:
+        kwargs["executable_path"] = local_browser
+        log.info(f"Using local browser: {local_browser}")
+
+    return p.chromium.launch_persistent_context(**kwargs)
 
 
 def navigate_to_fav(page, uid: str, fav: dict) -> bool:

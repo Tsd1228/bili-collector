@@ -18,7 +18,12 @@ import os
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-BILI_FAV_HOME = Path.home() / ".bilibili_fav"
+# 便携模式：默认在脚本同级目录
+_base_dir = Path(__file__).parent.resolve()
+if os.environ.get("BILI_PORTABLE", "1") == "0":
+    _base_dir = Path.home() / ".bilibili_fav"
+
+BILI_FAV_HOME = _base_dir
 UID_FILE = BILI_FAV_HOME / "bili_uid.txt"
 
 # 状态
@@ -44,17 +49,21 @@ def check_login() -> str | None:
 
 def do_login():
     try:
-        from bili_common import check_chromium, install_chromium, do_login as _do_login
+        from bili_common import find_local_browser, do_login as _do_login
         from playwright.sync_api import sync_playwright
 
-        if not check_chromium():
-            app_state["message"] = "Downloading Chromium (about 150MB), please wait..."
-            try:
-                install_chromium()
-            except Exception as e:
-                app_state["status"] = "error"
-                app_state["message"] = f"Chromium download failed: {e}. Please check your network."
-                return
+        # 如果本地有浏览器，直接用，不需要下载 Chromium
+        local_browser = find_local_browser()
+        if not local_browser:
+            from bili_common import check_chromium, install_chromium
+            if not check_chromium():
+                app_state["message"] = "Downloading Chromium (about 150MB), please wait..."
+                try:
+                    install_chromium()
+                except Exception as e:
+                    app_state["status"] = "error"
+                    app_state["message"] = f"Chromium download failed: {e}. Please install Chrome or Edge."
+                    return
 
         with sync_playwright() as p:
             uid = _do_login(p)

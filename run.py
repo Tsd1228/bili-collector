@@ -15,13 +15,19 @@ B站数据采集 — 一键运行
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-BILI_FAV_HOME = Path.home() / ".bilibili_fav"
+# 便携模式：默认在脚本同级目录
+_base_dir = Path(__file__).parent.resolve()
+if os.environ.get("BILI_PORTABLE", "1") == "0":
+    _base_dir = Path.home() / ".bilibili_fav"
+
+BILI_FAV_HOME = _base_dir
 UID_FILE = BILI_FAV_HOME / "bili_uid.txt"
 
 
