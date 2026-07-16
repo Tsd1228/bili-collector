@@ -121,6 +121,7 @@ def check_chromium() -> bool:
             env=driver_env,
             capture_output=True,
             text=True,
+            timeout=10,
         )
         return result.returncode == 0
     except Exception:
@@ -128,19 +129,48 @@ def check_chromium() -> bool:
 
 
 def install_chromium():
-    print("🌐 首次运行，正在下载 Chromium 浏览器（约 150MB）...")
-    print("   请稍候，下载完成后会自动继续...\n")
+    log.info("Downloading Chromium...")
 
+    import subprocess
+    import os
+
+    # Find the playwright driver
     try:
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
-            check=True,
-        )
-        print("\n✅ Chromium 浏览器安装完成")
-    except subprocess.CalledProcessError:
-        print("\n❌ Chromium 安装失败，请手动运行：")
-        print("   playwright install chromium")
-        sys.exit(1)
+        from playwright._impl._driver import compute_driver_executable, get_driver_env
+        driver_executable = compute_driver_executable()
+        driver_env = get_driver_env()
+    except Exception as e:
+        log.error(f"Cannot find playwright driver: {e}")
+        raise
+
+    # Allow mirror override via env var
+    download_host = os.environ.get("PLAYWRIGHT_DOWNLOAD_HOST")
+    if download_host:
+        log.info(f"Using mirror: {download_host}")
+        driver_env["PLAYWRIGHT_DOWNLOAD_HOST"] = download_host
+
+    # Try install with retries
+    for attempt in range(3):
+        try:
+            log.info(f"Attempt {attempt + 1}/3...")
+            result = subprocess.run(
+                [str(driver_executable), "install", "chromium"],
+                env=driver_env,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+            if result.returncode == 0:
+                log.info("Chromium installed")
+                return
+            else:
+                log.warning(f"Install returned code {result.returncode}: {result.stderr[:200]}")
+        except subprocess.TimeoutExpired:
+            log.warning(f"Attempt {attempt + 1} timed out")
+        except Exception as e:
+            log.warning(f"Attempt {attempt + 1} failed: {e}")
+
+    raise RuntimeError("Failed to install Chromium after 3 attempts")
 
 
 # ============================================================

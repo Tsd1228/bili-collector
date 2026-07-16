@@ -48,8 +48,13 @@ def do_login():
         from playwright.sync_api import sync_playwright
 
         if not check_chromium():
-            app_state["message"] = "Downloading Chromium, please wait..."
-            install_chromium()
+            app_state["message"] = "Downloading Chromium (about 150MB), please wait..."
+            try:
+                install_chromium()
+            except Exception as e:
+                app_state["status"] = "error"
+                app_state["message"] = f"Chromium download failed: {e}. Please check your network."
+                return
 
         with sync_playwright() as p:
             uid = _do_login(p)
