@@ -5,3 +5,4 @@ dist/
 *.spec
 .eggs/
 *.egg-info/
+.bilibili_fav/
