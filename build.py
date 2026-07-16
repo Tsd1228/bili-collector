@@ -45,6 +45,10 @@ def build_tool(tool_key):
         "--noconfirm",
         "--onefile",
         "--name", tool["name"],
+        "--collect-all", "playwright",
+        "--hidden-import", "playwright",
+        "--hidden-import", "playwright.sync_api",
+        "--hidden-import", "playwright._impl",
         str(script),
     ]
 
@@ -75,6 +79,7 @@ def main():
     print(f"  [OK] Python {sys.version.split()[0]}")
 
     print("\n[DEPS] installing...")
+    run_cmd([sys.executable, "-m", "pip", "install", "playwright", "-q"])
     run_cmd([sys.executable, "-m", "pip", "install", "aiohttp", "-q"])
     run_cmd([sys.executable, "-m", "pip", "install", "pyinstaller", "-q"])
 
