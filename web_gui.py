@@ -44,14 +44,18 @@ def check_login() -> str | None:
 
 def do_login():
     try:
-        from bili_common import do_login as _do_login
+        from bili_common import check_chromium, install_chromium, do_login as _do_login
         from playwright.sync_api import sync_playwright
+
+        if not check_chromium():
+            app_state["message"] = "Downloading Chromium, please wait..."
+            install_chromium()
 
         with sync_playwright() as p:
             uid = _do_login(p)
         app_state["uid"] = uid
         app_state["status"] = "logged_in"
-        app_state["message"] = "登录成功"
+        app_state["message"] = "Login OK"
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = str(e)
@@ -76,7 +80,7 @@ HTML = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>B站数据采集</title>
+    <title>BiliCollector</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -157,8 +161,8 @@ HTML = """<!DOCTYPE html>
 </head>
 <body>
     <div class="card">
-        <h1>B站数据采集</h1>
-        <p class="subtitle">登录你的 B站账号，一键采集收藏夹数据</p>
+        <h1>BiliCollector</h1>
+        <p class="subtitle">Login to your Bilibili account and collect data</p>
         
         <div class="status-box">
             <div id="status" class="status-text">正在检测登录状态...</div>
@@ -166,8 +170,8 @@ HTML = """<!DOCTYPE html>
         </div>
         
         <div id="actions">
-            <button id="loginBtn" class="btn hidden" onclick="doLogin()">登录 B站</button>
-            <button id="collectBtn" class="btn hidden" onclick="doCollect()">开始采集</button>
+            <button id="loginBtn" class="btn hidden" onclick="doLogin()">Login Bilibili</button>
+            <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
             <button id="retryBtn" class="btn hidden" onclick="doCollect()">重新采集</button>
         </div>
     </div>
@@ -191,18 +195,18 @@ HTML = """<!DOCTYPE html>
                     status.innerHTML = '<span class="spinner"></span>正在检测登录状态...';
                     break;
                 case 'need_login':
-                    status.textContent = '未登录，请点击下方按钮登录';
+                    status.textContent = 'Not logged in, click below to login';
                     loginBtn.classList.remove('hidden');
                     break;
                 case 'logged_in':
-                    status.textContent = '已登录';
+                    status.textContent = 'Logged in';
                     status.className = 'status-text success';
                     userInfo.textContent = 'UID: ' + data.uid;
                     userInfo.classList.remove('hidden');
                     collectBtn.classList.remove('hidden');
                     break;
                 case 'collecting':
-                    status.innerHTML = '<span class="spinner"></span>正在采集数据，请勿关闭...';
+                    status.innerHTML = '<span class="spinner"></span>Collecting data, please wait...';
                     break;
                 case 'done':
                     status.textContent = data.message;
@@ -210,13 +214,13 @@ HTML = """<!DOCTYPE html>
                     userInfo.textContent = 'UID: ' + data.uid;
                     userInfo.classList.remove('hidden');
                     retryBtn.classList.remove('hidden');
-                    retryBtn.textContent = '重新采集';
+                    retryBtn.textContent = 'Re-collect';
                     break;
                 case 'error':
-                    status.textContent = '错误: ' + data.message;
+                    status.textContent = 'Error: ' + data.message;
                     status.className = 'status-text error';
                     retryBtn.classList.remove('hidden');
-                    retryBtn.textContent = '重试';
+                    retryBtn.textContent = 'Retry';
                     break;
             }
         }
