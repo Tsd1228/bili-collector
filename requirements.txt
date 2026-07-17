@@ -1,0 +1,8 @@
+# 核心依赖（爬虫 + 分析 + Web GUI）
+playwright>=1.40.0
+
+# 辅助脚本依赖（动态爬虫、分析服务器）
+aiohttp>=3.9.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
