@@ -25,15 +25,18 @@
 
 ```
 bili_getdata/
-├── bilbil.py          # 爬虫：扫码登录 → 采集收藏夹 → 提取fav_time
-├── analyze.py         # 分析：读取JSON → LLM兴趣画像 → 加权分析 → 导出
-├── bili_common.py     # 通用工具：登录、UID管理、浏览器管理、API调用
-├── llm_config.py      # LLM统一配置：Ollama/DeepSeek/SiliconFlow/OpenAI切换
-├── web_gui.py         # Web界面展示报告
-├── start.py           # 启动入口
-├── start.sh           # Shell启动脚本
-├── requirements.txt   # Python依赖
-└── llm_config.json    # LLM配置（用户选择后生成）
+├── bilbil.py              # 爬虫：扫码登录 → 采集收藏夹 → 提取fav_time
+├── analyze.py             # 分析：读取JSON → LLM兴趣画像 → 加权分析 → 导出
+├── bili_common.py         # 通用工具：登录、UID管理、浏览器管理、API调用
+├── db.py                  # SQLite数据库：视频/标签持久化存储
+├── llm_config.py          # LLM统一配置：Ollama/DeepSeek/SiliconFlow/OpenAI切换
+├── web_gui.py             # Web界面展示报告
+├── start.py               # 流程调度入口
+├── start.sh               # 一键启动（自动走 venv）
+├── setup.sh               # 环境搭建（新机器用）
+├── requirements.txt       # Python核心依赖
+├── requirements-locked.txt# 锁定依赖版本（setup.sh 自动生成）
+└── llm_config.json        # LLM配置（用户选择后生成）
 ```
 
 ## 数据流
@@ -82,12 +85,19 @@ bili_getdata/
 ## 测试命令
 
 ```bash
-# 完整流程
+# 环境搭建（新机器）
+bash setup.sh                         # 一键安装依赖 + Playwright浏览器
+
+# 一键启动（自动走 venv）
+bash start.sh                         # 采集 → 分析 → 文案 → HTML导出
+
+# 分步运行（需先 source venv/bin/activate）
 python bilbil.py                      # 爬取（首次需扫码）
 python bilbil.py --incremental        # 增量更新
 python analyze.py                     # 分析
 python analyze.py --copy              # 生成文案
 python analyze.py --export            # 导出可读报告
+python db.py --fetch-tags             # 获取视频标签（标题不够时自动回退API）
 python llm_config.py --status         # 查看LLM状态
 python llm_config.py --config         # 配置LLM
 python web_gui.py                     # 启动Web界面
