@@ -5,6 +5,10 @@ echo   BiliCollector - Environment Setup
 echo ==============================================
 echo.
 
+:: 国内镜像源（Tuna 清华源，慢时可改阿里云）
+set PIP_MIRROR=https://pypi.tuna.tsinghua.edu.cn/simple
+set PIP_TRUST=--trusted-host pypi.tuna.tsinghua.edu.cn
+
 :: ---------- 1. Check Python ----------
 python --version >nul 2>&1
 if errorlevel 1 (
@@ -34,10 +38,10 @@ if exist venv\Scripts\python.exe (
 
 :: ---------- 3. Install dependencies ----------
 echo [..] Upgrading pip...
-venv\Scripts\python.exe -m pip install --upgrade pip -q
+venv\Scripts\python.exe -m pip install --upgrade pip -q -i %PIP_MIRROR% %PIP_TRUST%
 
 echo [..] Installing Python packages...
-venv\Scripts\pip.exe install -r requirements.txt -q
+venv\Scripts\pip.exe install -r requirements.txt -q -i %PIP_MIRROR% %PIP_TRUST%
 if errorlevel 1 (
     echo [ERROR] Package installation failed
     pause

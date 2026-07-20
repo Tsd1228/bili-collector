@@ -8,6 +8,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# 国内镜像源（Tuna 清华源，下载慢时可换阿里云：https://mirrors.aliyun.com/pypi/simple/）
+PIP_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"
+PIP_TRUST="--trusted-host pypi.tuna.tsinghua.edu.cn"
+
 echo "=============================================="
 echo "  B站收藏夹数据分析项目 — 环境搭建"
 echo "=============================================="
@@ -44,10 +48,10 @@ fi
 source venv/bin/activate
 
 echo "[..] 升级 pip..."
-pip install --upgrade pip -q
+pip install --upgrade pip -q -i "$PIP_MIRROR" $PIP_TRUST
 
 echo "[..] 安装 Python 依赖..."
-pip install -r requirements.txt -q
+pip install -r requirements.txt -q -i "$PIP_MIRROR" $PIP_TRUST
 
 echo "[OK] 依赖安装完成"
 
