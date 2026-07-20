@@ -109,16 +109,41 @@ def do_login():
 
 
 def do_collect():
+    """通过子进程运行采集，避免 Playwright 在 Web 服务线程中卡死"""
+    import subprocess, sys, time
     try:
-        from bilbil import collect_favorites
-
+        venv_python = sys.executable
+        bilbil = _base_dir / "bilbil.py"
         app_state["message"] = "正在打开浏览器采集数据..."
         app_state["collect_progress"] = "启动浏览器..."
-        videos = collect_favorites(uid=app_state["uid"], visible=True)
-        total = sum(len(v) for v in videos) if videos else 0
-        app_state["total_videos"] = total
-        app_state["status"] = "done"
-        app_state["message"] = f"采集完成！共 {total} 个视频"
+        uid = app_state.get("uid", "")
+
+        proc = subprocess.Popen(
+            [venv_python, "-u", str(bilbil), "--uid", uid, "--visible", "--incremental"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8",
+        )
+
+        # 实时读取输出
+        lines = []
+        while True:
+            line = proc.stdout.readline()
+            if not line and proc.poll() is not None:
+                break
+            if line:
+                line = line.rstrip()
+                lines.append(line)
+                app_state["collect_progress"] = line
+                if "完成" in line or "Error" in line or "错误" in line:
+                    app_state["message"] = line
+
+        rc = proc.wait()
+        if rc == 0:
+            app_state["status"] = "done"
+            app_state["message"] = "采集完成！"
+        else:
+            raise RuntimeError("\n".join(lines[-5:]))
+
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = f"采集失败: {e}"
