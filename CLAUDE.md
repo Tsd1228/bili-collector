@@ -32,8 +32,11 @@ bili_getdata/
 ├── llm_config.py          # LLM统一配置：Ollama/DeepSeek/SiliconFlow/OpenAI切换
 ├── web_gui.py             # Web界面展示报告
 ├── start.py               # 流程调度入口
-├── start.sh               # 一键启动（自动走 venv）
-├── setup.sh               # 环境搭建（新机器用）
+├── start.sh               # 一键启动（Linux/macOS，自动走 venv）
+├── start.bat              # 一键启动（Windows，自动走 venv）
+├── clean.sh               # 清理所有生成数据
+├── setup.sh               # 环境搭建（Linux/macOS）
+├── setup.bat              # 环境搭建（Windows）
 ├── requirements.txt       # Python核心依赖
 ├── requirements-locked.txt# 锁定依赖版本（setup.sh 自动生成）
 └── llm_config.json        # LLM配置（用户选择后生成）
@@ -86,10 +89,15 @@ bili_getdata/
 
 ```bash
 # 环境搭建（新机器）
-bash setup.sh                         # 一键安装依赖 + Playwright浏览器
+bash setup.sh                         # Linux/macOS：一键安装依赖 + Playwright浏览器
+setup.bat                             # Windows：双击运行
 
 # 一键启动（自动走 venv）
-bash start.sh                         # 采集 → 分析 → 文案 → HTML导出
+bash start.sh                         # Linux/macOS
+start.bat                             # Windows
+
+# 清理生成数据
+bash clean.sh                         # 删除所有爬取数据、报告、缓存
 
 # 分步运行（需先 source venv/bin/activate）
 python bilbil.py                      # 爬取（首次需扫码）

@@ -159,20 +159,6 @@ def load_videos(uid: str, favorite: str = None) -> list[dict]:
     return result
 
 
-def load_videos_by_bvid(uid: str, bvids: list[str]) -> dict[str, dict]:
-    """批量查询视频，返回 {bvid: dict}"""
-    if not bvids:
-        return {}
-    conn = connect(uid)
-    placeholders = ",".join("?" for _ in bvids)
-    rows = conn.execute(
-        f"SELECT * FROM videos WHERE bvid IN ({placeholders})", bvids
-    ).fetchall()
-    cols = [d[1] for d in conn.execute("PRAGMA table_info(videos)").fetchall()]
-    conn.close()
-    return {row[0]: dict(zip(cols, row)) for row in rows}
-
-
 def get_all_bvids(uid: str) -> set[str]:
     """获取数据库中所有 bvid"""
     conn = connect(uid)
