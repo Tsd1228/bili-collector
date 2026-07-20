@@ -147,12 +147,19 @@ def do_collect():
 
             rc = proc.wait()
 
-        # 读取完整日志用于错误提示
+        # 读取完整日志
         lines = log_file.read_text(encoding="utf-8").strip().split("\n")
         if rc == 0:
             app_state["status"] = "done"
             app_state["message"] = "采集完成！"
             app_state["collect_progress"] = lines[-1] if lines else ""
+            # 从日志解析视频数（"全部完成！共 88 个视频"）
+            import re
+            for line in lines:
+                m = re.search(r"全部完成！共 (\d+) 个视频", line)
+                if m:
+                    app_state["total_videos"] = int(m.group(1))
+                    break
         else:
             raise RuntimeError("\n".join(lines[-5:]))
 
@@ -193,7 +200,7 @@ def do_generate_copy():
             app_state["message"] = "文案已生成"
         else:
             app_state["status"] = "error"
-            app_state["message"] = "文案生成失败"
+            app_state["message"] = "文案生成失败（检查 LLM 配置：右上角模型选择器是否已切换到 DeepSeek 并填入 API Key）"
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = f"Copy generation failed: {e}"
