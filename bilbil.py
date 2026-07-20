@@ -175,6 +175,8 @@ def fetch_fav_times(page, media_id: int | str, total_count: int) -> dict[str, in
 # ============================================================
 
 MAX_SCROLLS = 15
+MAX_VIDEOS = 500         # 单次采集最多视频数（防B站保护）
+INTER_FOLDER_DELAY = 1.5 # 收藏夹间延迟（秒）
 
 
 def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
@@ -370,7 +372,20 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
                 # 标记完成
                 mark_done(progress_file, progress_key)
                 
-                log.info(f"提取到 {len(videos)} 个视频 -> {json_path}")
+                log.info(f"提取到 {len(videos)} 个视频 -> {json_path}（累计 {total_videos}）")
+
+                # 500 安全垫：达到上限时停止，剩余收藏夹下次再采集
+                if total_videos >= MAX_VIDEOS:
+                    remaining = len(created_watch) - idx
+                    if remaining > 0:
+                        log.info(f"达到单次上限 {MAX_VIDEOS} 个，剩余 {remaining} 个收藏夹留待下次")
+                    break
+
+                # 收藏夹间延迟，防止触发 B站 保护
+                if idx < len(created_watch) - 1:
+                    log.debug(f"等待 {INTER_FOLDER_DELAY}s...")
+                    page.wait_for_timeout(int(INTER_FOLDER_DELAY * 1000))
+
                 for v in videos[:3]:
                     log.info(f"  • {v['title'][:35]} | {v['author']} | {v['plays']}")
                 if len(videos) > 3:
@@ -382,6 +397,9 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
             log.info("浏览器已关闭")
         
         print(f"\n{'=' * 62}")
+        cap_hit = total_videos >= MAX_VIDEOS
+        if cap_hit:
+            log.info(f"达到单次上限 {MAX_VIDEOS} 个，运行 --incremental 继续采集剩余收藏夹")
         log.info(f"全部完成！共 {total_videos} 个视频")
         log.info(f"数据目录: {data_dir.resolve()}")
         print(f"{'=' * 62}")
