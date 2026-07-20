@@ -24,6 +24,9 @@ rm -f analysis_report_*.html
 rm -f analysis_report_*.txt
 rm -f copy_*.json
 
+# 点赞视频
+rm -f data_*/liked_videos.json
+
 # 运行时状态
 rm -f dynamic_config.json
 rm -f dynamic_progress*.json

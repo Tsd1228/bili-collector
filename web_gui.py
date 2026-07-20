@@ -196,6 +196,39 @@ HTML = """<!DOCTYPE html>
             display: flex;
             color: rgba(255,255,255,0.8);
         }
+        /* 近期动向 */
+        .liked-section { border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .liked-header {
+            padding: 10px 20px; cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; font-weight: 600;
+            color: rgba(255,255,255,0.3);
+            letter-spacing: 0.3px;
+            user-select: none; transition: color 0.15s;
+        }
+        .liked-header:hover { color: rgba(255,255,255,0.5); }
+        .liked-header .arrow { transition: transform 0.2s; font-size: 10px; }
+        .liked-header .arrow.open { transform: rotate(90deg); }
+        .liked-body { overflow: hidden; max-height: 0; transition: max-height 0.25s ease; }
+        .liked-body.open { max-height: 600px; }
+        .liked-item {
+            padding: 8px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.02);
+        }
+        .liked-item:last-child { border-bottom: none; }
+        .liked-item .li-title {
+            font-size: 12px; color: rgba(255,255,255,0.7);
+            margin-bottom: 4px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .liked-item .li-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .liked-item .li-tag {
+            font-size: 10px; padding: 2px 6px;
+            background: rgba(0,161,214,0.12);
+            color: rgba(0,161,214,0.7);
+            border-radius: 3px;
+        }
+        .liked-empty { padding: 16px 20px; font-size: 11px; color: rgba(255,255,255,0.15); }
         .sidebar {
             width: 380px; min-width: 380px;
             height: 100vh;
@@ -401,6 +434,16 @@ HTML = """<!DOCTYPE html>
                 <input type="checkbox" id="showPrivate" onchange="renderVideos();showCopy();"> 私密
             </label>
         </div>
+        <div class="liked-section" id="likedSection">
+            <div class="liked-header" onclick="toggleLiked()">
+                <span class="arrow">&#9654;</span>
+                <span>近期动向</span>
+                <span id="likedCount" style="font-weight:400;color:rgba(255,255,255,0.15)"></span>
+            </div>
+            <div class="liked-body" id="likedBody">
+                <div class="liked-empty">暂无数据</div>
+            </div>
+        </div>
         <div class="sidebar-list" id="videoList">
             <div class="sidebar-empty">等待采集数据...</div>
         </div>
@@ -490,6 +533,39 @@ HTML = """<!DOCTYPE html>
                 .catch(() => {});
         }
 
+        function toggleLiked() {
+            const body = document.getElementById('likedBody');
+            const arrow = document.querySelector('.liked-header .arrow');
+            body.classList.toggle('open');
+            arrow.classList.toggle('open');
+        }
+
+        function renderLikedVideos() {
+            fetch('/api/liked_videos')
+                .then(r => r.json())
+                .then(d => {
+                    const body = document.getElementById('likedBody');
+                    const cnt = document.getElementById('likedCount');
+                    const list = d.list || [];
+                    if (list.length === 0) {
+                        body.innerHTML = '<div class="liked-empty">暂无数据</div>';
+                        cnt.textContent = '';
+                        return;
+                    }
+                    cnt.textContent = list.length;
+                    let html = '';
+                    for (const v of list) {
+                        const tags = (v.tags || []).map(t => '<span class="li-tag">#' + t + '</span>').join('');
+                        html += '<div class="liked-item">';
+                        html += '<a class="li-title" href="https://www.bilibili.com/video/' + v.bvid + '" target="_blank">' + v.title + '</a>';
+                        html += '<div class="li-tags">' + tags + '</div>';
+                        html += '</div>';
+                    }
+                    body.innerHTML = html;
+                })
+                .catch(() => {});
+        }
+
         function updateUI(data) {
             const st = document.getElementById('status');
             const ui = document.getElementById('userInfo');
@@ -527,13 +603,14 @@ HTML = """<!DOCTYPE html>
                     st.className = 'status-text success';
                     ui.textContent = 'UID: ' + data.uid; ui.classList.remove('hidden');
                     clr.classList.remove('hidden'); ab.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
-                    renderVideos();
+                    renderVideos(); renderLikedVideos();
                     break;
                 case 'analyzed':
                     st.textContent = data.message;
                     st.className = 'status-text success';
                     ui.textContent = 'UID: ' + data.uid; ui.classList.remove('hidden');
                     clr.classList.remove('hidden'); cpb.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
+                    renderLikedVideos();
                     break;
                 case 'generating':
                     st.innerHTML = '<div class="spinner"></div>Generating copy...';
@@ -545,7 +622,7 @@ HTML = """<!DOCTYPE html>
                     ui.textContent = 'UID: ' + data.uid; ui.classList.remove('hidden');
                     clr.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
                     document.getElementById('privateToggle').classList.remove('hidden');
-                    showCopy();
+                    showCopy(); renderLikedVideos();
                     break;
                 case 'error':
                     st.textContent = data.message;
@@ -704,6 +781,19 @@ class Handler(BaseHTTPRequestHandler):
             uid = app_state.get("uid", "")
             months = load_videos_grouped(uid) if uid else {}
             self.wfile.write(json.dumps({"months": months}, ensure_ascii=False).encode("utf-8"))
+        elif self.path == "/api/liked_videos":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            uid = app_state.get("uid", "")
+            liked = []
+            if uid:
+                liked_path = BILI_FAV_HOME / f"data_{uid}" / "liked_videos.json"
+                try:
+                    liked = json.loads(liked_path.read_text("utf-8"))
+                except Exception:
+                    liked = []
+            self.wfile.write(json.dumps({"list": liked}, ensure_ascii=False).encode("utf-8"))
         elif self.path == "/api/llm_status":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

@@ -253,7 +253,7 @@ def fetch_missing_tags(uid: str, delay: float = 0.5) -> int:
         # 标题无意义 → 调 API
         try:
             url = f"https://api.bilibili.com/x/tag/archive/tags?bvid={bvid}"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.bilibili.com/"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             if data.get("code") == 0 and data.get("data"):

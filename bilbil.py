@@ -19,6 +19,9 @@ import argparse
 import json
 import re
 import sys
+import time
+import urllib.request
+import urllib.parse
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -27,7 +30,7 @@ from bili_common import (
     BILI_FAV_HOME, UID_FILE, get_data_dir, get_user_dir, get_progress_file,
     log, ensure_dir, safe_filename, retry,
     check_chromium, install_chromium, get_uid,
-    fetch_favorites, build_fav_url, print_fav_list, is_folder_private,
+    fetch_favorites, fetch_liked_videos, build_fav_url, print_fav_list, is_folder_private,
     scroll_to_bottom, load_progress, save_progress,
     mark_done, is_done, create_browser_context, navigate_to_fav,
 )
@@ -390,6 +393,78 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
 
 
 # ============================================================
+#  点赞视频采集
+# ============================================================
+
+
+def _fetch_tags_for_bvid(bvid: str, delay: float = 0.3) -> list[str]:
+    """通过 B站公开 API 获取视频标签，无需登录。"""
+    try:
+        time.sleep(delay)
+        url = f"https://api.bilibili.com/x/tag/archive/tags?bvid={bvid}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.bilibili.com/",
+        }
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            if data.get("code") == 0 and data.get("data"):
+                return [t["tag_name"] for t in data["data"]]
+    except Exception:
+        pass
+    return []
+
+
+def collect_liked_videos(uid: str, visible: bool = False):
+    """采集点赞视频并获取标签，保存到 liked_videos.json。"""
+    data_dir = get_data_dir(uid)
+    user_dir = get_user_dir(uid)
+    ensure_dir(data_dir)
+    ensure_dir(user_dir)
+
+    from bili_common import find_local_browser
+    if not find_local_browser():
+        if not check_chromium():
+            install_chromium()
+
+    with sync_playwright() as p:
+        uid = get_uid(p, uid)
+        context = create_browser_context(p, headless=not visible, uid=uid)
+        page = context.pages[0] if context.pages else context.new_page()
+
+        page.goto(f"https://space.bilibili.com/{uid}", timeout=60_000)
+        page.wait_for_timeout(3000)
+
+        if "登录" in page.title():
+            log.error("未登录")
+            context.close()
+            return []
+
+        liked = fetch_liked_videos(page, uid)
+        if not liked:
+            log.info("没有点赞视频数据")
+            context.close()
+            return []
+
+        # 获取每个视频的标签
+        log.info(f"获取 {len(liked)} 个视频的标签...")
+        for i, v in enumerate(liked, 1):
+            tags = _fetch_tags_for_bvid(v["bvid"])
+            v["tags"] = tags
+            if i % 5 == 0:
+                log.info(f"  标签获取: {i}/{len(liked)}")
+
+        # 保存
+        output = data_dir / "liked_videos.json"
+        output.write_text(json.dumps(liked, ensure_ascii=False, indent=2), encoding="utf-8")
+        log.info(f"点赞视频已保存: {output} ({len(liked)} 条)")
+
+        context.close()
+        return liked
+
+
+# ============================================================
 #  CLI 入口
 # ============================================================
 
@@ -405,16 +480,20 @@ def main():
     parser.add_argument("--reset", action="store_true", help="清除进度，重新提取")
     parser.add_argument("--fav", type=str, help="只提取指定收藏夹")
     parser.add_argument("--incremental", action="store_true", help="增量更新（只获取新视频）")
+    parser.add_argument("--likes", action="store_true", help="采集点赞视频（近期动向）")
     args = parser.parse_args()
 
-    collect_favorites(
-        uid=args.uid,
-        visible=args.visible,
-        manual=args.manual,
-        reset=args.reset,
-        fav_name=args.fav,
-        incremental=args.incremental,
-    )
+    if args.likes:
+        collect_liked_videos(uid=args.uid, visible=args.visible)
+    else:
+        collect_favorites(
+            uid=args.uid,
+            visible=args.visible,
+            manual=args.manual,
+            reset=args.reset,
+            fav_name=args.fav,
+            incremental=args.incremental,
+        )
 
 
 if __name__ == "__main__":

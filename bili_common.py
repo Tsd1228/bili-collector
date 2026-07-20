@@ -386,6 +386,45 @@ def fetch_favorites(page, uid: str) -> list[dict]:
     return all_favs
 
 
+# ============================================================
+# 点赞视频 API
+# ============================================================
+
+
+def fetch_liked_videos(page, uid: str) -> list[dict]:
+    """获取用户最近点赞的视频列表（最多 20 条）。"""
+    result = page.evaluate("""
+        async (uid) => {
+            try {
+                const resp = await fetch(
+                    `https://api.bilibili.com/x/space/like/video?vmid=${uid}`,
+                    { credentials: "include" }
+                );
+                const data = await resp.json();
+                if (data.code === 0 && data.data) {
+                    return (data.data.list || []).map(v => ({
+                        bvid: v.bvid,
+                        title: v.title,
+                        author: v.author,
+                        plays: v.play,
+                        pic: v.pic || "",
+                    }));
+                }
+                return { error: data.message || "liked API error" };
+            } catch (e) {
+                return { error: e.message };
+            }
+        }
+    """, uid)
+
+    if isinstance(result, list):
+        log.info(f"点赞视频: {len(result)} 条")
+        return result
+    else:
+        log.warning(f"获取点赞视频失败: {result.get('error')}")
+        return []
+
+
 def print_fav_list(favorites: list[dict], show_all: bool = True):
     """打印收藏夹清单"""
     created_watch = [f for f in favorites if f.get("subtype") in ("created", "watch_later")]
