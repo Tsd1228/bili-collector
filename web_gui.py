@@ -109,38 +109,50 @@ def do_login():
 
 
 def do_collect():
-    """通过子进程运行采集，避免 Playwright 在 Web 服务线程中卡死"""
-    import subprocess, sys, time
+    """通过子进程运行采集（写日志文件避免管道死锁）"""
+    import subprocess, sys, time, tempfile
     try:
         venv_python = sys.executable
         bilbil = _base_dir / "bilbil.py"
+        uid = app_state.get("uid", "")
+        log_file = _base_dir / "data" / f"collect_{uid}.log" if uid else _base_dir / "data" / "collect.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+
         app_state["message"] = "正在打开浏览器采集数据..."
         app_state["collect_progress"] = "启动浏览器..."
-        uid = app_state.get("uid", "")
 
-        proc = subprocess.Popen(
-            [venv_python, "-u", str(bilbil), "--uid", uid, "--visible", "--incremental"],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, encoding="utf-8",
-        )
+        with open(log_file, "w", encoding="utf-8") as fp:
+            proc = subprocess.Popen(
+                [venv_python, "-u", str(bilbil), "--uid", uid, "--visible", "--incremental"],
+                stdout=fp, stderr=subprocess.STDOUT,
+                text=True,
+            )
 
-        # 实时读取输出
-        lines = []
-        while True:
-            line = proc.stdout.readline()
-            if not line and proc.poll() is not None:
-                break
-            if line:
-                line = line.rstrip()
-                lines.append(line)
-                app_state["collect_progress"] = line
-                if "完成" in line or "Error" in line or "错误" in line:
-                    app_state["message"] = line
+            # 轮询进程 + 读出最后一行到 collect_progress
+            t0 = time.time()
+            timeout = 600  # 10分钟超时
+            while proc.poll() is None:
+                time.sleep(1)
+                # 读最后一行日志
+                try:
+                    with open(log_file, "r", encoding="utf-8") as lf:
+                        last = list(lf)[-1:]
+                        if last:
+                            app_state["collect_progress"] = last[-1].strip()
+                except Exception:
+                    pass
+                if time.time() - t0 > timeout:
+                    proc.kill()
+                    raise TimeoutError(f"采集超时（{timeout}s）")
 
-        rc = proc.wait()
+            rc = proc.wait()
+
+        # 读取完整日志用于错误提示
+        lines = log_file.read_text(encoding="utf-8").strip().split("\n")
         if rc == 0:
             app_state["status"] = "done"
             app_state["message"] = "采集完成！"
+            app_state["collect_progress"] = lines[-1] if lines else ""
         else:
             raise RuntimeError("\n".join(lines[-5:]))
 
