@@ -450,7 +450,7 @@ HTML = """<!DOCTYPE html>
 
         .model-panel {
             position: fixed; top: 46px; right: 16px; z-index: 10;
-            width: 240px;
+            width: 280px;
             background: rgba(20,20,35,0.95); backdrop-filter: blur(20px);
             border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
             padding: 12px;
@@ -471,6 +471,30 @@ HTML = """<!DOCTYPE html>
         .model-option .mo-check { color: #4ade80; display: none; }
         .model-option.active .mo-check { display: inline; }
         .model-option input { display: none; }
+        /* 内联配置区 */
+        .model-config {
+            padding: 8px 10px; margin: 4px 0 6px;
+            background: rgba(0,0,0,0.2); border-radius: 8px;
+            display: none;
+        }
+        .model-config.show { display: block; }
+        .model-config input {
+            width: 100%; padding: 5px 8px; margin-bottom: 5px;
+            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 5px; color: rgba(255,255,255,0.7); font-size: 11px;
+            outline: none; box-sizing: border-box;
+        }
+        .model-config input:focus { border-color: rgba(0,161,214,0.4); }
+        .model-config .mc-actions { display: flex; gap: 4px; }
+        .model-config .mc-btn {
+            flex: 1; padding: 4px 0; font-size: 10px; font-weight: 500;
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 5px;
+            cursor: pointer; transition: all 0.15s; text-align: center;
+            color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.04);
+        }
+        .model-config .mc-btn:hover { color: #00a1d6; border-color: rgba(0,161,214,0.3); background: rgba(0,161,214,0.08); }
+        .model-config .mc-btn.save { color: #4ade80; border-color: rgba(74,222,128,0.3); }
+        .model-config .mc-btn.save:hover { background: rgba(74,222,128,0.1); }
 
         .footer { text-align: center; margin-top: 16px; font-size: 10px; color: rgba(255,255,255,0.12); }
     </style>
@@ -739,6 +763,14 @@ HTML = """<!DOCTYPE html>
                     html += '<span class="mo-model">' + (prov.model || '') + '</span>';
                     html += '<span class="mo-check">' + check + '</span>';
                     html += '</div>';
+                    // 配置面板（默认对当前 provider 展开）
+                    const showCfg = prov.key === d.current && prov.key !== 'ollama' ? ' show' : '';
+                    html += '<div class="model-config' + showCfg + '" data-cfg="' + prov.key + '">';
+                    html += '<input class="mc-key" placeholder="API Key" value="' + (prov.has_key ? '••••••••' : '') + '">';
+                    html += '<input class="mc-model" placeholder="Model name" value="' + (prov.model || '') + '">';
+                    html += '<div class="mc-actions">';
+                    html += '<span class="mc-btn" onclick="saveModelConfig(\'' + prov.key + '\')">&#10003; Save</span>';
+                    html += '</div></div>';
                 }
                 p.innerHTML = html;
                 document.getElementById('modelLabel').textContent = d.current || 'auto';
@@ -746,25 +778,41 @@ HTML = """<!DOCTYPE html>
             }).catch(() => {});
         }
 
-        function switchModel(provider) {
+        function saveModelConfig(provider) {
+            const panel = document.getElementById('modelPanel');
+            const keyInput = panel.querySelector('.model-config[data-cfg="' + provider + '"] .mc-key');
+            const modelInput = panel.querySelector('.model-config[data-cfg="' + provider + '"] .mc-model');
             fetch('/api/llm_switch', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({provider: provider}),
+                body: JSON.stringify({
+                    provider: provider,
+                    api_key: keyInput && keyInput.value && !keyInput.value.includes('••') ? keyInput.value : undefined,
+                    model: modelInput ? modelInput.value : undefined,
+                }),
             }).then(r => r.json()).then(d => {
-                document.getElementById('modelPanel').classList.remove('show');
+                panel.classList.remove('show');
                 document.getElementById('modelLabel').textContent = provider;
                 document.getElementById('modelDot').className = 'model-dot online';
+                // 刷新状态
+                setTimeout(loadModelStatus, 500);
             });
         }
 
-        // 点击面板外关闭 & 模型选择（事件委托）
+        // 点击面板外关闭
         document.addEventListener('click', function(e) {
             const btn = document.getElementById('modelBtn');
             const panel = document.getElementById('modelPanel');
             const opt = e.target.closest('.model-option');
             if (opt) {
-                switchModel(opt.dataset.prov);
+                // 展开对应配置区
+                const prov = opt.dataset.prov;
+                panel.querySelectorAll('.model-config').forEach(c => c.classList.remove('show'));
+                const cfg = panel.querySelector('.model-config[data-cfg="' + prov + '"]');
+                if (cfg && prov !== 'ollama') cfg.classList.add('show');
+                // 高亮
+                panel.querySelectorAll('.model-option').forEach(o => o.classList.remove('active'));
+                opt.classList.add('active');
                 return;
             }
             if (!btn.contains(e.target) && !panel.contains(e.target)) {
