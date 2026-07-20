@@ -1,5 +1,5 @@
 #!/bin/bash
-# B站收藏夹数据分析项目 — 一键启动
+# B站收藏夹数据分析项目 — 启动 Web GUI
 # 自动检测 venv，无需手动激活
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -25,4 +25,4 @@ if [ -z "$PYTHON" ]; then
     exit 1
 fi
 
-exec "$PYTHON" start.py
+exec "$PYTHON" web_gui.py

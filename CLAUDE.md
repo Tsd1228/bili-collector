@@ -32,8 +32,8 @@ bili_getdata/
 ├── llm_config.py          # LLM统一配置：Ollama/DeepSeek/SiliconFlow/OpenAI切换
 ├── web_gui.py             # Web界面展示报告
 ├── start.py               # 流程调度入口
-├── start.sh               # 一键启动（Linux/macOS，自动走 venv）
-├── start.bat              # 一键启动（Windows，自动走 venv）
+├── start.sh               # 启动 Web GUI（Linux/macOS，自动走 venv）
+├── start.bat              # 启动 Web GUI（Windows，自动走 venv）
 ├── clean.sh               # 清理所有生成数据
 ├── setup.sh               # 环境搭建（Linux/macOS）
 ├── setup.bat              # 环境搭建（Windows）
@@ -92,7 +92,7 @@ bili_getdata/
 bash setup.sh                         # Linux/macOS：一键安装依赖 + Playwright浏览器
 setup.bat                             # Windows：双击运行
 
-# 一键启动（自动走 venv）
+# 启动 Web GUI（采集→分析→文案 都在网页上操作）
 bash start.sh                         # Linux/macOS
 start.bat                             # Windows
 
