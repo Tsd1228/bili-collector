@@ -418,11 +418,6 @@ def _fetch_tags_for_bvid(bvid: str, delay: float = 0.3) -> list[str]:
 
 def collect_liked_videos(uid: str, visible: bool = False):
     """采集点赞视频并获取标签，保存到 liked_videos.json。"""
-    data_dir = get_data_dir(uid)
-    user_dir = get_user_dir(uid)
-    ensure_dir(data_dir)
-    ensure_dir(user_dir)
-
     from bili_common import find_local_browser
     if not find_local_browser():
         if not check_chromium():
@@ -430,6 +425,10 @@ def collect_liked_videos(uid: str, visible: bool = False):
 
     with sync_playwright() as p:
         uid = get_uid(p, uid)
+        data_dir = get_data_dir(uid)
+        user_dir = get_user_dir(uid)
+        ensure_dir(data_dir)
+        ensure_dir(user_dir)
         context = create_browser_context(p, headless=not visible, uid=uid)
         page = context.pages[0] if context.pages else context.new_page()
 
