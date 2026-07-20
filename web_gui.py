@@ -111,11 +111,12 @@ def do_collect():
     try:
         from bilbil import collect_favorites
 
-        videos = collect_favorites(uid=app_state["uid"])
+        app_state["message"] = "正在打开浏览器采集数据..."
+        videos = collect_favorites(uid=app_state["uid"], visible=True)
         total = sum(len(v) for v in videos) if videos else 0
         app_state["total_videos"] = total
         app_state["status"] = "done"
-        app_state["message"] = f"Done! {total} videos collected"
+        app_state["message"] = f"采集完成！共 {total} 个视频"
     except Exception as e:
         app_state["status"] = "error"
         app_state["message"] = str(e)
