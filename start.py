@@ -157,6 +157,16 @@ def main():
     print(f"  HTML 报告: {SCRIPT_DIR / 'analysis_report.html'}")
     print(f"{'=' * 50}")
 
+    # 自动启动 Web GUI
+    print(f"\n{'─' * 50}")
+    print("  Web 界面启动中...")
+    try:
+        subprocess.Popen([python, str(SCRIPT_DIR / "web_gui.py")])
+        print("  → http://localhost:18234")
+        print("  关闭页面即可退出")
+    except Exception as e:
+        print(f"  [警告] Web 界面启动失败: {e}")
+
 
 if __name__ == "__main__":
     main()
