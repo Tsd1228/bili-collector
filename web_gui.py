@@ -30,6 +30,7 @@ app_state = {
     "dest_url": "",
     "copy_result": None,
     "copy_title": "",
+    "collect_progress": "",
 }
 
 
@@ -112,6 +113,7 @@ def do_collect():
         from bilbil import collect_favorites
 
         app_state["message"] = "正在打开浏览器采集数据..."
+        app_state["collect_progress"] = "启动浏览器..."
         videos = collect_favorites(uid=app_state["uid"], visible=True)
         total = sum(len(v) for v in videos) if videos else 0
         app_state["total_videos"] = total
@@ -119,7 +121,9 @@ def do_collect():
         app_state["message"] = f"采集完成！共 {total} 个视频"
     except Exception as e:
         app_state["status"] = "error"
-        app_state["message"] = str(e)
+        app_state["message"] = f"采集失败: {e}"
+        import traceback
+        app_state["collect_progress"] = traceback.format_exc()
 
 
 def do_analyze():
