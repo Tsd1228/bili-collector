@@ -85,7 +85,37 @@ def check_login() -> str | None:
     user_dir = BILI_FAV_HOME / f"user_data_{uid}"
     if not user_dir.exists():
         return None
+    # 验证 session 未过期（公共场所登录 24h 后失效）
+    if not _verify_session(uid):
+        return None
     return uid
+
+
+def _verify_session(uid: str) -> bool:
+    """用 Playwright 轻量验证 B站 登录 session 是否仍有效"""
+    user_dir = BILI_FAV_HOME / f"user_data_{uid}"
+    if not user_dir.exists():
+        return False
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                str(user_dir), headless=True, no_viewport=True,
+            )
+            page = ctx.new_page()
+            ok = page.evaluate("""
+                async () => {
+                    try {
+                        const r = await fetch('https://api.bilibili.com/x/space/myinfo', {credentials: 'include'});
+                        const d = await r.json();
+                        return d.code === 0;
+                    } catch(e) { return false; }
+                }
+            """)
+            ctx.close()
+            return bool(ok)
+    except Exception:
+        return False
 
 
 def do_login():
@@ -119,9 +149,14 @@ def do_collect():
     """通过子进程运行采集（写日志文件避免管道死锁）"""
     import subprocess, sys, time, tempfile
     try:
+        # 采集前再次验证 session（防止运行期间过期）
+        uid = app_state.get("uid", "")
+        if not uid or not _verify_session(uid):
+            app_state["status"] = "need_login"
+            app_state["message"] = "Session 已过期，请重新登录"
+            return
         venv_python = sys.executable
         bilbil = _base_dir / "bilbil.py"
-        uid = app_state.get("uid", "")
         log_file = _base_dir / "data" / f"collect_{uid}.log" if uid else _base_dir / "data" / "collect.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
 
