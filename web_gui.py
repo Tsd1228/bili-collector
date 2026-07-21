@@ -149,11 +149,10 @@ def do_collect():
     """通过子进程运行采集（写日志文件避免管道死锁）"""
     import subprocess, sys, time, tempfile
     try:
-        # 采集前再次验证 session（防止运行期间过期）
         uid = app_state.get("uid", "")
-        if not uid or not _verify_session(uid):
+        if not uid:
             app_state["status"] = "need_login"
-            app_state["message"] = "Session 已过期，请重新登录"
+            app_state["message"] = "请先登录"
             return
         venv_python = sys.executable
         bilbil = _base_dir / "bilbil.py"
@@ -194,6 +193,12 @@ def do_collect():
 
         # 读取完整日志
         lines = log_file.read_text(encoding="utf-8").strip().split("\n")
+        full_log = "\n".join(lines)
+        if "[SESSION_EXPIRED]" in full_log:
+            app_state["status"] = "need_login"
+            app_state["message"] = "Session 已过期，请重新登录"
+            app_state["collect_progress"] = ""
+            return
         if rc == 0:
             app_state["status"] = "done"
             app_state["message"] = "采集完成！"

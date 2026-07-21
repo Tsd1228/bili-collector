@@ -285,6 +285,7 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
         page.wait_for_timeout(2000)
         
         if "登录" in page.title():
+            print("[SESSION_EXPIRED] B站登录 session 已过期，请重新登录")
             log.error("未登录，请删除 user_data 目录后重新运行")
             context.close()
             return []
@@ -495,6 +496,7 @@ def collect_liked_videos(uid: str, visible: bool = False):
         page.wait_for_timeout(3000)
 
         if "登录" in page.title():
+            print("[SESSION_EXPIRED] B站登录 session 已过期，请重新登录")
             log.error("未登录")
             context.close()
             return []
