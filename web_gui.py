@@ -129,8 +129,11 @@ def do_collect():
         app_state["collect_progress"] = "启动浏览器..."
 
         with open(log_file, "w", encoding="utf-8") as fp:
+            cmd = [venv_python, "-u", str(bilbil), "--uid", uid, "--incremental"]
+            if sys.platform == "win32":
+                cmd.append("--visible")
             proc = subprocess.Popen(
-                [venv_python, "-u", str(bilbil), "--uid", uid, "--visible", "--incremental"],
+                cmd,
                 stdout=fp, stderr=subprocess.STDOUT,
                 text=True,
             )
@@ -776,7 +779,7 @@ HTML = """<!DOCTYPE html>
                     html += '<input class="mc-key" placeholder="API Key" value="' + (prov.has_key ? '••••••••' : '') + '">';
                     html += '<input class="mc-model" placeholder="Model name" value="' + (prov.model || '') + '">';
                     html += '<div class="mc-actions">';
-                    html += '<span class="mc-btn" onclick="saveModelConfig(\'' + prov.key + '\')">&#10003; Save</span>';
+                    html += '<span class="mc-btn" onclick="saveModelConfig(\\'' + prov.key + '\\')">&#10003; Save</span>';
                     html += '</div></div>';
                 }
                 p.innerHTML = html;
@@ -846,6 +849,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/", "/index.html"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
             self.end_headers()
             self.wfile.write(HTML.encode("utf-8"))
         elif self.path == "/api/status":

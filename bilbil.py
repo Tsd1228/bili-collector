@@ -170,6 +170,55 @@ def fetch_fav_times(page, media_id: int | str, total_count: int) -> dict[str, in
     """, [str(media_id), total_count])
 
 
+def fetch_fav_videos_api(page, media_id: int | str, max_count: int = 500) -> list[dict]:
+    """通过 API 翻页获取收藏夹内全部视频（标题/播放量/收藏时间等）。
+
+    替代 scroll_to_bottom + extract_videos_from_page + fetch_fav_times 这套流程。
+    """
+    return page.evaluate("""
+        async (args) => {
+            const [mediaId, maxCount] = args;
+            const all = [];
+            let pn = 1;
+            let hasMore = true;
+
+            while (hasMore && all.length < maxCount) {
+                const resp = await fetch(
+                    `https://api.bilibili.com/x/v3/fav/resource/list` +
+                    `?media_id=${mediaId}&pn=${pn}&ps=20&platform=web&web_location=333.1387`,
+                    { credentials: "include" }
+                );
+                const data = await resp.json();
+                if (data.code !== 0 || !data.data?.medias || data.data.medias.length === 0)
+                    break;
+
+                for (const m of data.data.medias) {
+                    let plays = m.play ?? 0;
+                    let playsStr = plays >= 10000
+                        ? (plays / 10000).toFixed(1).replace(/\\.0$/, '') + '万'
+                        : String(plays);
+
+                    all.push({
+                        bvid: m.bvid,
+                        title: m.title || '',
+                        author: m.author || '',
+                        plays: playsStr,
+                        danmaku: String(m.danmaku || ''),
+                        duration: m.duration || '',
+                        link: m.link || `https://www.bilibili.com/video/${m.bvid}`,
+                        pic: m.cover || '',
+                        fav_time: m.fav_time || 0,
+                    });
+                }
+
+                hasMore = data.data.has_more === true;
+                pn++;
+            }
+            return all;
+        }
+    """, [str(media_id), max_count])
+
+
 # ============================================================
 #  核心采集函数（供外部调用）
 # ============================================================
@@ -316,36 +365,28 @@ def collect_favorites(uid: str, visible: bool = False, manual: bool = False,
                     page.wait_for_timeout(2000)
                 else:
                     navigate_to_fav(page, uid, fav)
-                
-                # 滚动加载
-                scroll_to_bottom(page, max_scrolls=MAX_SCROLLS)
-                
-                # 回到顶部
-                page.evaluate("window.scrollTo(0, 0)")
-                page.wait_for_timeout(500)
-                
-                # 提取数据（带重试）
-                try:
-                    videos = retry(lambda: extract_videos_from_page(page), max_retries=2)
-                except Exception as e:
-                    log.error(f"提取失败: {e}")
-                    videos = []
 
-                # 获取收藏时间 fav_time（通过 API）
-                if videos:
+                # 通过 API 翻页获取全部视频数据（替代旧的滚动+DOM提取）
+                try:
+                    videos = fetch_fav_videos_api(page, fav["id"], MAX_VIDEOS)
+                except Exception as e:
+                    log.error(f"  API 获取失败: {e}")
+                    # 降级：走旧流程（滚动+DOM提取）
+                    scroll_to_bottom(page, max_scrolls=MAX_SCROLLS)
+                    page.evaluate("window.scrollTo(0, 0)")
+                    page.wait_for_timeout(500)
                     try:
+                        videos = retry(lambda: extract_videos_from_page(page), max_retries=2)
                         fav_times = fetch_fav_times(page, fav["id"], len(videos))
                         for v in videos:
                             bvid = extract_bvid(v.get("link", ""))
                             if bvid and bvid in fav_times:
                                 v["fav_time"] = fav_times[bvid]
-                        dated = sum(1 for v in videos if "fav_time" in v)
-                        if dated < len(videos):
-                            log.warning(f"  仅获取到 {dated}/{len(videos)} 个视频的收藏时间")
-                        else:
-                            log.info(f"  已获取全部 {dated} 个视频的收藏时间")
-                    except Exception as e:
-                        log.warning(f"  获取收藏时间失败: {e}")
+                    except Exception as e2:
+                        log.error(f"  降级提取也失败: {e2}")
+                        videos = []
+
+                log.info(f"  获取到 {len(videos)} 个视频")
 
                 # 增量模式：按 link 去重合并
                 if incremental and existing:

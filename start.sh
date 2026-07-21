@@ -5,6 +5,9 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# 杀掉已有 web_gui 进程释放端口
+fuser -k 18234/tcp 2>/dev/null || true
+
 # 找 Python
 PYTHON=""
 if [ -f "venv/bin/python3" ]; then

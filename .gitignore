@@ -27,6 +27,7 @@ copy_*.json
 dynamic_config.json
 dynamic_progress*.json
 llm_config.json
+data/
 
 # ── 其他 ──
 outbox/
