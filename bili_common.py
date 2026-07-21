@@ -196,6 +196,35 @@ def do_login(p, uid: str = None) -> str:
         # 先检查是否有保存的 UID
         if UID_FILE.exists():
             target_uid = UID_FILE.read_text().strip()
+            # 验证缓存的 session 是否仍有效（公共场所 24h 过期）
+            if target_uid:
+                user_dir = get_user_dir(target_uid)
+                if user_dir.exists():
+                    try:
+                        ctx = p.chromium.launch_persistent_context(
+                            str(user_dir), headless=True, no_viewport=True,
+                        )
+                        page = ctx.new_page()
+                        ok = page.evaluate("""
+                            async () => {
+                                try {
+                                    const r = await fetch('https://api.bilibili.com/x/space/myinfo', {credentials: 'include'});
+                                    const d = await r.json();
+                                    return d.code === 0;
+                                } catch(e) { return false; }
+                            }
+                        """)
+                        ctx.close()
+                        if ok:
+                            return target_uid
+                        log.info("Session 已过期，清空旧数据重新登录")
+                    except Exception:
+                        log.warning("session 验证失败，重新登录")
+                    # session 过期，清空旧数据走扫码
+                    import shutil
+                    shutil.rmtree(str(user_dir))
+                    target_uid = None
+                    UID_FILE.unlink(missing_ok=True)
     
     if not target_uid:
         # 需要扫码登录，先用临时目录获取 UID
