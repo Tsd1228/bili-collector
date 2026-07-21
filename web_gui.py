@@ -604,6 +604,7 @@ HTML = """<!DOCTYPE html>
                 <button id="collectBtn" class="btn hidden" onclick="doCollect()">Start Collection</button>
                 <button id="analyzeBtn" class="btn btn-secondary hidden" onclick="doAnalyze()">Generate Report</button>
                 <button id="copyBtn" class="btn btn-secondary hidden" onclick="doCopy()">Generate Copy</button>
+                <button id="exportBtn" class="btn btn-secondary hidden" onclick="doExportHtml()">&#x1F4E5; Export HTML</button>
                 <button id="retryBtn" class="btn btn-secondary hidden" onclick="doCollect()">Retry</button>
                 <button id="switchBtn" class="btn btn-secondary hidden" onclick="doSwitch()">Switch Account</button>
             </div>
@@ -696,11 +697,12 @@ HTML = """<!DOCTYPE html>
             const cb = document.getElementById('collectBtn');
             const ab = document.getElementById('analyzeBtn');
             const cpb = document.getElementById('copyBtn');
+            const eb = document.getElementById('exportBtn');
             const rb = document.getElementById('retryBtn');
             const clr = document.getElementById('clearBtn');
             const sb = document.getElementById('switchBtn');
 
-            [lb, cb, ab, cpb, rb, sb].forEach(b => b.classList.add('hidden'));
+            [lb, cb, ab, cpb, eb, rb, sb].forEach(b => b.classList.add('hidden'));
             clr.classList.add('hidden');
 
             switch(data.status) {
@@ -732,7 +734,7 @@ HTML = """<!DOCTYPE html>
                     st.textContent = data.message;
                     st.className = 'status-text success';
                     ui.textContent = 'UID: ' + data.uid; ui.classList.remove('hidden');
-                    clr.classList.remove('hidden'); cpb.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
+                    clr.classList.remove('hidden'); cpb.classList.remove('hidden'); eb.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
                     renderLikedVideos();
                     break;
                 case 'generating':
@@ -743,7 +745,7 @@ HTML = """<!DOCTYPE html>
                     st.textContent = data.message;
                     st.className = 'status-text success';
                     ui.textContent = 'UID: ' + data.uid; ui.classList.remove('hidden');
-                    clr.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
+                    clr.classList.remove('hidden'); eb.classList.remove('hidden'); rb.classList.remove('hidden'); sb.classList.remove('hidden');
                     document.getElementById('privateToggle').classList.remove('hidden');
                     showCopy(); renderLikedVideos();
                     break;
@@ -773,6 +775,15 @@ HTML = """<!DOCTYPE html>
         function doCollect() { fetch('/api/collect', {method:'POST'}).then(r=>r.json()).then(d=>pollStatus()) }
         function doAnalyze() { fetch('/api/analyze', {method:'POST'}).then(r=>r.json()).then(d=>pollStatus()) }
         function doCopy() { fetch('/api/generate_copy', {method:'POST'}).then(r=>r.json()).then(d=>pollStatus()) }
+        function doExportHtml() {
+            fetch('/api/export_html').then(r=>r.json()).then(d => {
+                if (d.status === 'ok') {
+                    window.open('/download/' + d.filename, '_blank');
+                } else {
+                    alert('导出失败: ' + (d.error || '未知错误'));
+                }
+            }).catch(e => alert('导出失败: ' + e.message));
+        }
         function doSwitch() {
             document.getElementById('copySection').classList.add('hidden');
             fetch('/api/switch_account', {method:'POST'}).then(r=>r.json()).then(d => {
@@ -925,6 +936,36 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 resp = {"result": None}
             self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
+        elif self.path == "/api/export_html":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            uid = app_state.get("uid", "")
+            if not uid:
+                self.wfile.write(json.dumps({"error": "未登录"}).encode("utf-8"))
+                return
+            try:
+                from analyze import export_html
+                path = export_html(uid=uid)
+                if path:
+                    self.wfile.write(json.dumps({"status": "ok", "filename": path.name}).encode("utf-8"))
+                else:
+                    self.wfile.write(json.dumps({"error": "导出失败，请先生成报告"}).encode("utf-8"))
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path.startswith("/download/"):
+            filename = self.path.split("/download/", 1)[-1]
+            filepath = _base_dir / filename
+            if filepath.exists() and filepath.is_file():
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(filepath.read_bytes())
+            else:
+                self.send_response(404)
+                self.end_headers()
         elif self.path == "/api/videos":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
