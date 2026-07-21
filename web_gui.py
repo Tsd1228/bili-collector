@@ -47,23 +47,30 @@ def _load_private_folders(uid: str) -> set[str]:
 
 
 def load_videos_grouped(uid: str) -> dict[str, list]:
-    """从 DB 读取视频，按 fav_time 的月份分组（新→旧），标记私密视频"""
+    """从 JSON 文件读取视频，按 fav_time 的月份分组（新→旧），标记私密视频"""
     try:
-        import db
         from datetime import datetime, timezone
 
         private_folders = _load_private_folders(uid)
-        videos = db.load_videos(uid)
+        data_dir = _base_dir / f"data_{uid}"
         months: dict[str, list] = {}
-        for v in videos:
-            fav = v.get("favorite", v.get("_favorite", ""))
-            v["is_private"] = fav in private_folders
-            ts = v.get("fav_time")
-            if ts:
-                month = datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime("%Y-%m")
-            else:
-                month = "???"
-            months.setdefault(month, []).append(v)
+        if not data_dir.exists():
+            return {}
+
+        for fp in sorted(data_dir.glob("*.json")):
+            if fp.stem.startswith(".") or fp.stem in ("folders", "liked_videos"):
+                continue
+            fav_name = fp.stem
+            videos = json.loads(fp.read_text("utf-8"))
+            for v in videos:
+                v["is_private"] = fav_name in private_folders
+                v["favorite"] = fav_name
+                ts = v.get("fav_time")
+                if ts:
+                    month = datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime("%Y-%m")
+                else:
+                    month = "???"
+                months.setdefault(month, []).append(v)
         return dict(sorted(months.items(), reverse=True))
     except Exception:
         return {}
@@ -737,7 +744,7 @@ HTML = """<!DOCTYPE html>
                     updateUI(d);
                     if (['done','analyzed','copy_done','error','logged_in'].includes(d.status))
                         clearInterval(pollTimer);
-                });
+                }).catch(() => {});
             }, 1000);
         }
 
@@ -826,6 +833,8 @@ HTML = """<!DOCTYPE html>
             updateUI(d);
             if (['checking','collecting','generating'].includes(d.status)) pollStatus();
             if (d.status === 'copy_done') showCopy();
+        }).catch(e => {
+            document.getElementById('status').innerHTML = '<span style="color:#f87171">Connection failed: ' + e.message + '</span><br><span style="font-size:11px;color:rgba(255,255,255,0.3)">Make sure the server is running on port 18234</span>';
         });
     </script>
 </body>
